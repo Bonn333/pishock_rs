@@ -25,9 +25,9 @@ async fn main() {
     let shock_duration = std::env::var("PISHOCK_DURATION").unwrap_or("1".to_string());
     let shock_duration = shock_duration.trim_end();
 
-    let shocker_share_code = std::env::var("PISHOCK_SHARECODE").unwrap_or(String::new());
-    let shocker_api_key = std::env::var("PISHOCK_APIKEY").unwrap_or(String::new());
-    let shocker_api_username = std::env::var("PISHOCK_USERNAME").unwrap_or(String::new());
+    let shocker_share_code = std::env::var("PISHOCK_SHARECODE").unwrap_or_default();
+    let shocker_api_key = std::env::var("PISHOCK_APIKEY").unwrap_or_default();
+    let shocker_api_username = std::env::var("PISHOCK_USERNAME").unwrap_or_default();
 
     println!("Shock intensity (PISHOCK_INTENSITY): {shock_intensity}");
     println!("Shock duration (PISHOCK_DURATION): {shock_duration}");

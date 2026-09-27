@@ -1,29 +1,39 @@
-use log::{debug, error};
 use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum PiShockError {
-    #[error("Share code doesn't exist")]
+    /// The share code is not linked to this account.
+    /// Share codes have to be added to the account on pishock.com before they can be used.
+    #[error("Share code not found on this account")]
     ShareCodeNotFound,
+    /// No shocker with this ID exists on this account
+    #[error("Shocker {} not found on this account", .0)]
+    ShockerNotFound(u64),
     #[error("Username or API key invalid")]
     InvalidCredentials,
     #[error("Shocker is in paused state")]
     ShockerPaused,
-    #[error("Shocker is offline")]
-    ShockerOffline,
-    #[error("Share code is already in use")]
-    ShareCodeInUse,
-    #[error("Invalid OP code specified: {}", .0)]
-    InvalidOpCode(u32),
+    /// The share code does not permit this operation (e.g. `"shock"`)
+    #[error("Operation not permitted for this shocker: {}", .0)]
+    PermissionDenied(&'static str),
     #[error("Invalid intensity specified, max intensity: {}", .0)]
     /// The maximum intensity the shocker can deploy
     InvalidIntensity(u32),
     #[error("Invalid duration specified, max duration: {}", .0)]
-    /// The maximum duration the shocker can deploy
+    /// The maximum duration the shocker can deploy (in seconds)
     InvalidDuration(u32),
     #[error("Connection error: {}", .0)]
     ConnectionError(String),
+    /// The broker did not answer in time
+    #[error("Timed out waiting for the PiShock broker")]
+    Timeout,
+    /// The broker rejected the command
+    #[error("PiShock broker error {}: {}", .code.as_deref().unwrap_or("(no code)"), .message)]
+    BrokerError {
+        code: Option<String>,
+        message: String,
+    },
     #[error("Shocker is busy")]
     ShockerBusy,
     #[error("Unknown error: {}", .0)]
@@ -33,48 +43,26 @@ pub enum PiShockError {
     CooldownExceeded(Duration),
 }
 
-/// Converts possible HTTP responses to the respective `PiShock` errors
-/// This list is NOT exhaustive, the skipped errors are handled by the `PiShock` functions and should not ever be sent by the API
-pub(crate) fn error_to_pishock_error<S: Into<String> + Clone>(
-    error: S,
-) -> Result<(), PiShockError> {
-    debug!(
-        "Resolving body text to PiShockError: {}",
-        error.clone().into()
-    );
-
-    if error
-        .clone()
-        .into()
-        .contains("Intensity must be between 0 and ")
-    {
-        return Err(PiShockError::InvalidIntensity(
-            error.into().split(' ').last().unwrap().parse().unwrap(),
-        ));
-    }
-
-    if error
-        .clone()
-        .into()
-        .contains("Duration must be between 1 and ")
-    {
-        return Err(PiShockError::InvalidDuration(
-            error.into().split(' ').last().unwrap().parse().unwrap(),
-        ));
-    }
-
-    match error.clone().into().as_ref() {
-        "Operation Succeeded." => Ok(()),
-        "Device in Use." => Err(PiShockError::ShockerBusy),
-        "Share code not found" | "This code doesn’t exist." => {
-            Err(PiShockError::ShareCodeNotFound)
+impl From<reqwest::Error> for PiShockError {
+    fn from(error: reqwest::Error) -> Self {
+        if error.is_timeout() {
+            PiShockError::Timeout
+        } else if error.is_decode() {
+            PiShockError::UnknownError(format!("Failed to parse PiShock API response: {error}"))
+        } else {
+            PiShockError::ConnectionError(error.to_string())
         }
-        "Not Authorized." => Err(PiShockError::InvalidCredentials),
-        "Shocker is Paused, unable to send command." => Err(PiShockError::ShockerPaused),
-        "Device currently not connected." => Err(PiShockError::ShockerOffline),
-        "This share code has already been used by somebody else." => {
-            Err(PiShockError::ShareCodeInUse)
+    }
+}
+
+impl From<tokio_tungstenite::tungstenite::Error> for PiShockError {
+    fn from(error: tokio_tungstenite::tungstenite::Error) -> Self {
+        use tokio_tungstenite::tungstenite::Error as WsError;
+        match error {
+            WsError::Http(response) if matches!(response.status().as_u16(), 401 | 403) => {
+                PiShockError::InvalidCredentials
+            }
+            _ => PiShockError::ConnectionError(error.to_string()),
         }
-        _ => Err(PiShockError::UnknownError(error.into())),
     }
 }

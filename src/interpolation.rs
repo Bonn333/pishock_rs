@@ -80,8 +80,7 @@ impl PiShocker {
 
             info!(
                 "Shock step graph - 1 step = {}ms\n{}",
-                INTERPOLATION_RESOLUTION,
-                chart_line.to_string()
+                INTERPOLATION_RESOLUTION, chart_line
             );
         }
 

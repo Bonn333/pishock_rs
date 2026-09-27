@@ -1,11 +1,11 @@
 [package]
 name = "pishock_rs"
-version = "2.1.1"
+version = "3.0.0"
 edition = "2021"
 license = "MPL-2.0"
 keywords = ["pishock"]
 categories = ["api-bindings"]
-description = "Rust library for the PiShock API"
+description = "Rust library for the PiShock API (v2 REST + WebSocket broker)"
 repository = "https://github.com/GermanPerson/pishock_rs"
 readme = "README.md"
 authors = ["GermanPerson", "N3ptune"]
@@ -16,6 +16,8 @@ documentation = "https://docs.rs/pishock_rs"
 
 [dependencies]
 reqwest = { version = "0.11", features = ["json"] }
+tokio-tungstenite = { version = "0.30", features = ["native-tls"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 tokio = { version = "1", features = ["full"] }
 thiserror = "1.0.38"
 serde = { version = "1.0.130", features = ["derive"] }
